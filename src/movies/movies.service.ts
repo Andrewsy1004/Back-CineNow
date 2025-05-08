@@ -166,7 +166,33 @@ export class MoviesService {
     }
   }
   
-   
+
+
+  async getMovies(page: number = 1) {
+    try {
+      const limit = 10;
+
+      const [movies, total] = await this.movieRepository.findAndCount({
+        take: limit,
+        skip: (page - 1) * limit,
+        order: { id: 'ASC' } // Opcional: ordenar por algún campo
+      });
+  
+      const totalPages = Math.ceil(total / limit);
+  
+      return {
+        movies,
+        total,
+        totalPages,
+        currentPage: page,
+        perPage: limit
+      };
+  
+    } catch (error) {
+      this.logger.error('Error fetching movies', error);
+      throw new Error('Error fetching movies'); 
+    }
+  }
 
  
   

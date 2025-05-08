@@ -1,5 +1,5 @@
 
-import { Body, Controller, Get } from '@nestjs/common';
+import { Body, Controller, Get, Query } from '@nestjs/common';
 
 import { MoviesService } from './movies.service';
 import { GetSeatMoviesDto } from './dto';
@@ -18,7 +18,15 @@ export class MoviesController {
   async getMoviesSeats( @Body() getSeatMoviesDto: GetSeatMoviesDto ) {
     return await this.moviesService.getMoviesSeats( getSeatMoviesDto );
   }
+ 
 
+  @Get('getMovies')
+  @Auth()
+  async getMoviesPagination(
+    @Query('page') limit: number,
+  ) {
+       return await this.moviesService.getMovies( limit );
+  }
 
 
 }
