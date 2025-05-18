@@ -1,6 +1,6 @@
 
 import { Column, Entity, JoinColumn, ManyToOne, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
-import { Auditorium, Movie, Seat } from '.';
+import { Auditorium, Movie, Seat, Sell } from '.';
 
 @Entity('Funcion')
 export class MovieScreening {
@@ -31,7 +31,12 @@ export class MovieScreening {
   )
   silla: Seat[];
   
-
+   @OneToMany(
+    () => Sell,
+    (Sell) => Sell.Funcion,
+  )
+   Sell: Sell[];
+   
 
   @Column('text')
   hora_inicio: string;

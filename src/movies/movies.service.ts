@@ -6,10 +6,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 
 import { user } from 'src/auth/entities';
-import { Auditorium, Movie, MovieScreening, Seat } from './entities';
+import { Auditorium, Movie, MovieScreening, Seat, Sell } from './entities';
 
 import { AuthService } from 'src/auth/auth.service';
-import { GetSeatMoviesDto } from './dto';
+import { createSeatMoviesDto, GetSeatMoviesDto } from './dto';
 
 @Injectable()
 export class MoviesService {
@@ -32,6 +32,9 @@ export class MoviesService {
 
     @InjectRepository(Seat)
     private readonly SeatRepository: Repository<Seat>,
+    
+    @InjectRepository(Sell)
+    private readonly sellRepository: Repository<Sell>,
 
     private readonly authService: AuthService
   ) {}
@@ -40,17 +43,7 @@ export class MoviesService {
   async getMoviesSeats( getSeatMoviesDto: GetSeatMoviesDto ){
     try {
       
-      console.log('getSeatMoviesDto', getSeatMoviesDto);
-
-      // const NumeroCuenta = "123 456 789";
-      const fecha = "2025-04-28";
-
-      const hora = "10:00 - 12:00";
-      const hora_inicio = "13";
-      const hora_final = "15";
-     
-      const peliculaId = "1020414";
-
+      const { fecha, hora_inicio, hora_final, peliculaId } = getSeatMoviesDto;
 
       // VERIFICAR SI EXISTE O NO UNA FUNCION EN ESE DIA CON ESAS PELICULAS A ESAS HORAS 
 
@@ -100,7 +93,7 @@ export class MoviesService {
           });
 
           await this.funcionRepository.save(newScreening);
-
+    
           return {
             msg: "funcion creada a partir de una nueva sala disponible",
             asientos: [""]
@@ -175,7 +168,7 @@ export class MoviesService {
       const [movies, total] = await this.movieRepository.findAndCount({
         take: limit,
         skip: (page - 1) * limit,
-        order: { id: 'ASC' } // Opcional: ordenar por algún campo
+        order: { id: 'ASC' } 
       });
   
       const totalPages = Math.ceil(total / limit);
@@ -194,10 +187,128 @@ export class MoviesService {
     }
   }
 
- 
+  async createMoviesSeats( createseatDto: createSeatMoviesDto, userId: string ) {
+    try {
+      
+      const { posicion, hora_inicio, hora_final, fecha, id_pelicula, total, metodo_pago } = createseatDto;
+      
+      // Encontrar la funcion, para tomar rel id de la sala y la funcion
+      const funcion = await this.funcionRepository.findOne({
+        where: {
+          pelicula: { id: id_pelicula },
+          fecha,
+          hora_inicio,
+          hora_final,
+        },
+        relations: ['pelicula', 'sala'],
+      });
+       
+      if (!funcion) throw new Error('Funcion not found');
+      
+      // Insertar los asientos en la tabla Seat
+      const newSeats = posicion.map((pos) => {
+        const seat = this.SeatRepository.create({
+          posicion: pos,
+          sala: { id: funcion.sala.id },
+          salaF: { id: funcion.id },
+        });
+        return seat;
+      });
+     
+      await this.SeatRepository.save(newSeats);
+      
+      // Generar la factura
+      const newBill = this.sellRepository.create({
+        user: { id: userId },
+        Funcion: { id: funcion.id },
+        fecha,
+        total,
+        metodo_pago,
+        numero_asientos: posicion,
+      });
+
+      await this.sellRepository.save(newBill);
+        
+
+      return {
+        msg: "asientos creados y factura generada"
+      };
+
+    } catch (error) {
+      this.logger.error('Error creating movies', error);
+      throw new Error('Error creating movies'); 
+    }
+  }
   
+
+  async getBillByUser( userId: string ) {
+    try {
+         
+      const bills = await this.sellRepository.find({
+        where: {
+          user: { id: userId },
+        },
+        relations: ['user', 'Funcion', 'Funcion.pelicula', 'Funcion.sala'],
+      });
+
+      if (!bills || bills.length === 0) {
+        throw new Error('Bills not found');
+      }
+
+      const formattedBills = bills.map((bill) => ({
+        ID: bill.id,
+        Película: bill.Funcion?.pelicula?.titulo ?? 'Sin título',
+        Entradas: bill.numero_asientos?.join(', ') ?? 'Sin asientos',
+        Fecha: bill.fecha,
+        Total: bill.total,
+        Sala: bill.Funcion?.sala?.nombre ?? 'Sin sala',
+      }));
+
+      return {
+        msg: 'facturas',
+        bills: formattedBills,
+      };
+      
+    }catch (error) {
+      this.logger.error('Error fetching movies', error);
+      throw new Error('Error fetching movies'); 
+    }
+  }
+
   
-  
+  async getTicketByUser( userId: string ) {
+    try {
+
+      const tickets = await this.sellRepository.find({
+        where: {
+          user: { id: userId },
+        },
+        relations: ['user', 'Funcion', 'Funcion.pelicula', 'Funcion.sala'],
+      });
+
+      if (!tickets || tickets.length === 0) throw new Error('Tickets not found');
+      
+
+      const formattedTickets = tickets.map((ticket) => ({
+        ID: ticket.id,
+        Película: ticket.Funcion?.pelicula?.titulo ?? 'Sin título',
+        Entradas: ticket.numero_asientos?.join(', ') ?? 'Sin asientos',
+        Fecha: ticket.fecha,
+        Hora: ticket.Funcion?.hora_inicio + ':' + ticket.Funcion?.hora_final ,
+        Total: ticket.total,
+        Sala: ticket.Funcion?.sala?.nombre ?? 'Sin sala',
+      }));
+
+      return {
+        msg: 'tickets',
+        tickets: formattedTickets,
+      };
+      
+    } catch (error) {
+      this.logger.error('Error fetching movies', error);
+      throw new Error('Error fetching movies'); 
+    }
+  }
 
   
    

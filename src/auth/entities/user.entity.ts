@@ -1,6 +1,6 @@
 
 
-import { Movie } from "src/movies/entities";
+import { Movie, Sell } from "src/movies/entities";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
 
 
@@ -52,5 +52,12 @@ export class user {
         ( Movie ) => Movie.usuario
     )
     pelicula: Movie;
+
+
+    @OneToMany(
+        () => Sell,
+        ( Sell ) => Sell.user
+    )
+    Sell: Sell;
 
 }
