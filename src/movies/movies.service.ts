@@ -288,7 +288,6 @@ export class MoviesService {
 
       if (!tickets || tickets.length === 0) throw new Error('Tickets not found');
       
-
       const formattedTickets = tickets.map((ticket) => ({
         ID: ticket.id,
         Película: ticket.Funcion?.pelicula?.titulo ?? 'Sin título',
@@ -309,9 +308,126 @@ export class MoviesService {
       throw new Error('Error fetching movies'); 
     }
   }
-
   
+
+  async getGeneralStatistics (  ) {
+    try {
+
+      const ventasTotales = await this.sellRepository
+        .createQueryBuilder('sell')
+        .select('SUM(CAST(sell.total AS DECIMAL))', 'totalVentas')
+        .getRawOne();
+
+       const entradasVendidas = await this.sellRepository.count();
+
+       const peliculasActivas = await this.movieRepository.count();
+
+       return {
+         msg: 'estadísticas generales',
+         ventasTotales: ventasTotales?.totalVentas ?? 0, 
+         entradasVendidas,
+         peliculasActivas,
+       };
+      
+    } catch (error) {
+      this.logger.error('Error fetching movies', error);
+      throw new Error('Error fetching movies');
+    } 
+  }
+  
+  async getAmountOfSellsByMonth() {
+    try {
+      
+      const salesByMonth = await this.sellRepository
+        .createQueryBuilder('sell')
+        .select("TO_CHAR(TO_DATE(sell.fecha, 'YYYY-MM-DD'), 'YYYY Month')", 'month')
+        .addSelect('COUNT(*)', 'totalSales')
+        .groupBy("TO_CHAR(TO_DATE(sell.fecha, 'YYYY-MM-DD'), 'YYYY Month')")
+        .orderBy('month', 'ASC')
+        .getRawMany();
+
+       const formattedResults = salesByMonth.map((item) => ({
+        month: item.month
+          .split(' ')
+          .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' '), 
+        totalSales: parseInt(item.totalSales, 10),
+      }));
+
+
+      return {
+        msg: 'Número de ventas por mes',
+        data: formattedResults,
+      };
+
+
+    } catch (error) {
+      this.logger.error('Error al obtener ventas por mes', error.stack);
+      throw new Error(`Error al obtener ventas por mes: ${error.message}`);
+    }
+  }
+
+  async getTheMostPopularMovies() {
+  try {
+       const popularMovies = await this.sellRepository
+        .createQueryBuilder('sell')
+        .select('movie.titulo', 'title')
+        .addSelect('COUNT(*)', 'totalSales')
+        .innerJoin('sell.Funcion', 'funcion')
+        .innerJoin('funcion.pelicula', 'movie')
+        .groupBy('movie.titulo')
+        .orderBy('COUNT(*)', 'DESC') 
+        .limit(5)
+        .getRawMany();
+      
+    
+      const formattedMovies = popularMovies.map(movie => ({
+        title: movie.title,
+        totalTickets: parseInt(movie.totalSales, 10), 
+      }));
+
+      return {
+        msg: 'Las películas más populares',
+        data: formattedMovies,
+      };
+
+  } catch (error) {
+    this.logger.error('Error al obtener las películas más populares', error.stack);
+    throw new Error(`Error al obtener las películas más populares: ${error.message}`);
+  }
+}
+
+
+ async GetTheRoomsWithMoreSells () {
+  try {
+
+      const roomsWithMoreSells = await this.sellRepository
+      .createQueryBuilder('sell')
+      .select('sala.nombre', 'name')
+      .addSelect('SUM(CAST(sell.total AS NUMERIC))', 'totalRevenue')
+      .innerJoin('sell.Funcion', 'funcion')
+      .innerJoin('funcion.sala', 'sala')
+      .groupBy('sala.nombre')
+      .orderBy('SUM(CAST(sell.total AS NUMERIC))', 'DESC') 
+      .limit(5)
+      .getRawMany();
+
    
+    const formattedRooms = roomsWithMoreSells.map(room => ({
+      name: room.name,
+      totalRevenue: parseFloat(room.totalRevenue).toFixed(2), 
+    }));
+
+    return {
+      msg: 'Las salas con más ingresos',
+      data: formattedRooms,
+    };
+
+  } catch (error) {
+    this.logger.error('Error al obtener las salas con más ventas', error.stack);
+    throw new Error(`Error al obtener las salas con más ventas: ${error.message}`);
+  }
+ }
 
 
 

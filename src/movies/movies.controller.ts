@@ -5,6 +5,7 @@ import { MoviesService } from './movies.service';
 import { createSeatMoviesDto, GetSeatMoviesDto } from './dto';
 
 import { Auth, GetUser } from 'src/auth/decorators';
+import { ValidRoles } from 'src/auth/interfaces';
 
 
 @Controller('movies')
@@ -55,6 +56,34 @@ export class MoviesController {
   ) {
     return await this.moviesService.getTicketByUser( userId );
   }  
+
+  @Get('GetGeneralStadistic')
+  @Auth( ValidRoles.Administrador )  
+  async getGeneralStadistic () {
+    return await this.moviesService.getGeneralStatistics();
+  }  
+
+  @Get('SellByMonth')
+  @Auth( ValidRoles.Administrador )  
+  async getSellByMonth () {
+    return await this.moviesService.getAmountOfSellsByMonth();
+  }  
+
+  @Get('GetMostPopularMovies')
+  @Auth( ValidRoles.Administrador )  
+  async GetMostPopularMovies () {
+    return await this.moviesService.getTheMostPopularMovies();
+  }  
+
+  @Get('IncomesByAuditorium')
+  @Auth( ValidRoles.Administrador )  
+  async IncomesByAuditorium () {
+    return await this.moviesService.GetTheRoomsWithMoreSells();
+  }  
+
+
+
+  
 
 
 }

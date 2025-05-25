@@ -2,6 +2,7 @@
 
 import { Movie, Sell } from "src/movies/entities";
 import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from "typeorm";
+import { LogUsers } from ".";
 
 
 @Entity('Usuario')
@@ -59,5 +60,12 @@ export class user {
         ( Sell ) => Sell.user
     )
     Sell: Sell;
+
+
+     @OneToMany(
+        () => LogUsers,
+        ( LogUsers ) => LogUsers.user
+    )
+    logs: LogUsers;
 
 }

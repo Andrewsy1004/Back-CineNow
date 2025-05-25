@@ -1,6 +1,6 @@
 
 
-import { Body, Controller, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req } from '@nestjs/common';
 
 import { CreateUserDto, LoginUserDto, UpdateUserDto } from './dto';
 import { AuthService } from './auth.service';
@@ -15,6 +15,11 @@ export class AuthController {
   @Post('register')
   create(@Body() createUserDto: CreateUserDto ) {
     return this.authService.create(createUserDto );
+  }
+
+  @Post('registerUser')
+  createUsers(@Body() createUserDto: CreateUserDto ) {
+    return this.authService.createUsers(createUserDto );
   }
 
   @Post('login')
@@ -39,6 +44,21 @@ export class AuthController {
   RegisterUser( @Body() createUserDto: CreateUserDto ) {
     return this.authService.CreateUserByAdminCashier( createUserDto );
   }
+
+  
+  @Get('GetLogsUser')
+  @Auth( ValidRoles.Administrador )  
+  GetLogs( ) {
+    return this.authService.getLogsUser();
+  }
+  
+  
+  @Get('GetAllUsers')
+  @Auth( ValidRoles.Administrador )  
+  GetAllUsers( ) {
+    return this.authService.getAllUsers();
+  }
+
 
 
 }

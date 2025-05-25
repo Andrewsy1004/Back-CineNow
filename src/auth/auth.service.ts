@@ -4,9 +4,9 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
 
 import * as bcrypt from 'bcrypt';
-import { Repository } from 'typeorm';
+import { In, Not, Raw, Repository } from 'typeorm';
 
-import { user } from './entities';
+import { LogUsers, user } from './entities';
 import { JwtPayload } from './interfaces';
 import { CreateUserDto, LoginUserDto, UpdateUserDto } from './dto';
 
@@ -19,7 +19,10 @@ export class AuthService {
     constructor(
         @InjectRepository(user)
         private readonly userRepository: Repository<user>,
-    
+        
+        @InjectRepository(LogUsers)
+        private readonly logRepository: Repository<LogUsers>,
+
         private readonly jwtService: JwtService,
       ) {}
 
@@ -64,6 +67,18 @@ export class AuthService {
         if( user.activo === false ) throw new UnauthorizedException(' El usuario no esta activo, por favor contacte al administrador ');
         
         delete user.contrasena;
+
+        // Auditoria 
+
+        const log = this.logRepository.create({
+          user: { id: user.id },
+          fecha: new Date().toLocaleDateString(),
+          hora:  new Date().toLocaleTimeString(),
+        });
+       
+        
+        await this.logRepository.save( log )
+        await this.logRepository.save( log )
 
         return {
           ...user,
@@ -110,6 +125,86 @@ export class AuthService {
         } catch (error) {
           if (error instanceof BadRequestException) throw error;
           this.handleDBErrors(error);
+        }
+      }
+
+
+      async createUsers( createUserDto: CreateUserDto) {
+    
+        try {
+    
+          const { contrasena, ...userData  } = createUserDto;
+          
+          // Verificar si el correo ya existe
+          const existingUser = await this.userRepository.findOneBy({ correo: userData.correo });
+
+          if (existingUser) {
+            delete existingUser.contrasena; 
+            return {
+              ...existingUser,
+              token : this.getJwtToken({ id: existingUser.id })
+            };
+          }
+
+          // Crear el nuevo usuario
+          const user = this.userRepository.create({
+            ...userData,
+            contrasena: bcrypt.hashSync( contrasena, 10 ),
+          });
+    
+          await this.userRepository.save( user )
+          delete user.contrasena;
+    
+          return {
+            ...user,
+            token: this.getJwtToken({ id: user.id })
+          };
+          
+    
+        } catch (error) {
+           if (error instanceof BadRequestException) throw error;
+           this.handleDBErrors(error);
+        }
+      }
+      
+      async getLogsUser() {
+        try {
+
+          const logs = await this.logRepository.find( {
+            relations: {
+              user: true,
+            },
+          });
+
+          const formattedLogs = logs.map((log) => ({
+            ...log,
+            user: {
+              nombre: log.user.nombre,
+              apellido: log.user.apellido,
+              correo: log.user.correo,
+            },
+          }));
+          
+          return formattedLogs;
+          
+        } catch (error) {
+          this.handleDBErrors(error); 
+        }
+      }
+
+      async getAllUsers () {
+        try {
+          
+          const users = await this.userRepository.find({
+            where: {
+             roles: Raw((alias) => `${alias} && ARRAY['Administrador']::text[] = false`),
+            },
+          });
+
+          return users;
+        
+        } catch (error) {
+          this.handleDBErrors(error); 
         }
       }
 
